@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <title>Взаємодія провідників зі струмом</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #000;
+        }
+        
+        #ui {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            color: white;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        #current-slider {
+            width: 200px;
+            margin: 10px 0;
+        }
+        
+        .control-label {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .current-value {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        
+        .info {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #bbb;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div class="control-label">Сила струму в першому провіднику:</div>
+        <input type="range" id="current-slider" min="-5" max="5" step="0.1" value="2">
+        <div class="current-value" id="current-display">2.0 А</div>
+        
+        <div class="info">
+            <strong>Керування:</strong><br>
+            • Регулюйте силу струму повзунком<br>
+            • Позитивний струм - вгору<br>
+            • Негативний струм - вниз<br>
+            • Однакові напрямки - притягання<br>
+            • Протилежні напрямки - відштовхування<br>
+            • Блакитні кільця - поле за годинниковою<br>
+            • Фіолетові кільця - поле проти годинникової
+        </div>
+    </div>
+
+    <a-scene background="color: #001122" fog="type: linear; color: #001122; near: 1; far: 50">
+        <!-- Освітлення -->
+        <a-light type="ambient" color="#404040"></a-light>
+        <a-light type="directional" position="5 10 5" color="#ffffff" intensity="0.8"></a-light>
+        
+        <!-- Камера -->
+        <a-camera position="0 2 8" look-controls wasd-controls></a-camera>
+        
+        <!-- Перший провідник (керований) -->
+        <a-entity id="conductor1" position="-2 0 0">
+            <a-cylinder id="wire1" radius="0.1" height="6" color="#FF6B35" 
+                        position="0 0 0" rotation="0 0 0"
+                        material="opacity: 0.5; transparent: true"
+                        animation__glow="property: material.emissive; to: #FF2200; dur: 1000; dir: alternate; loop: true">
+            </a-cylinder>
+            
+            <!-- Електрони для першого провідника -->
+            <a-entity id="electrons1"></a-entity>
+            
+            <!-- Стрілка напрямку струму -->
+            <a-cone id="arrow1" radius-bottom="0.15" radius-top="0" height="0.4" 
+                   color="#FFFF00" position="0 3.5 0" rotation="0 0 0"></a-cone>
+        </a-entity>
+        
+        <!-- Другий провідник (фіксований струм) -->
+        <a-entity id="conductor2" position="2 0 0">
+            <a-cylinder id="wire2" radius="0.1" height="6" color="#4A90E2" 
+                        position="0 0 0" rotation="0 0 0"
+                        animation__glow="property: material.emissive; to: #0066FF; dur: 1000; dir: alternate; loop: true">
+            </a-cylinder>
+            
+            <!-- Електрони для другого провідника -->
+            <a-entity id="electrons2"></a-entity>
+            
+            <!-- Стрілка напрямку струму -->
+            <a-cone id="arrow2" radius-bottom="0.15" radius-top="0" height="0.4" 
+                   color="#FFFF00" position="0 3.5 0" rotation="0 0 0"></a-cone>
+        </a-entity>
+        
+        <!-- Силові лінії магнітного поля -->
+        <a-entity id="field-lines"></a-entity>
+        
+        <!-- Індикатор сили взаємодії -->
+        <a-text id="force-indicator" 
+                position="0 4 0" 
+                align="center" 
+                font="kelsonsans"
+                color="#FFFFFF"
+                value="Притягання: СЕРЕДНЄ"
+                scale="1.5 1.5 1.5">
+        </a-text>
+        
+        <!-- Легенда -->
+        <a-text position="-4 -2 0" 
+                align="left" 
+                font="kelsonsals"
+                color="#CCCCCC"
+                value="Червоний провід: Змінний струм\nСиній провід: Фіксований струм А вгору\nЖовті точки: Електрони\nБлакитні кільця: Магнітне поле +"
+                scale="0.8 0.8 0.8">
+        </a-text>
+    </a-scene>
+
+    <script>
+        // Параметри системи
+        let current1 = 2.0; // Струм у першому провіднику
+        const current2 = 3.0; // Фіксований струм у другому провіднику
+        const maxForce = 5.0; // Максимальна сила взаємодії
+        const baseDistance = 4.0; // Базова відстань між провідниками
+        
+        // Елементи сцени
+        const conductor1 = document.getElementById('conductor1');
+        const conductor2 = document.getElementById('conductor2');
+        const arrow1 = document.getElementById('arrow1');
+        const arrow2 = document.getElementById('arrow2');
+        const forceIndicator = document.getElementById('force-indicator');
+        const electronsContainer1 = document.getElementById('electrons1');
+        const electronsContainer2 = document.getElementById('electrons2');
+        const fieldLines = document.getElementById('field-lines');
+        
+        // Створення електронів
+        function createElectrons(container, count, color) {
+            container.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                const electron = document.createElement('a-sphere');
+                electron.setAttribute('radius', '0.05');
+                electron.setAttribute('color', color);
+                electron.setAttribute('material', `emissive: ${color}; emissiveIntensity: 0.5; opacity: 0.3; transparent: true`);
+                
+                // Початкова позиція за межами провідника
+                electron.setAttribute('position', `0 -3.5 0`);
+                
+                container.appendChild(electron);
+            }
+        }
+        
+        // Анімація руху електронів
+        function animateElectrons(container, current, direction) {
+            const electrons = container.children;
+            const speed = Math.abs(current) * 2000; // Швидкість анімації
+            
+            for (let i = 0; i < electrons.length; i++) {
+                const electron = electrons[i];
+                
+                if (current !== 0) {
+                    const animationId = `electron-move-${i}`;
+                    electron.removeAttribute(`animation__${animationId}`);
+                    
+                    // Початкова позиція залежить від напрямку
+                    const startY = direction > 0 ? -3 : 3;
+                    const endY = direction > 0 ? 3 : -3;
+                    
+                    // Встановлюємо початкову позицію
+                    electron.setAttribute('position', `0 ${startY} 0`);
+                    
+                    // Створюємо анімацію руху в одну сторону
+                    electron.setAttribute(`animation__${animationId}`, {
+                        property: 'position',
+                        to: `0 ${endY} 0`,
+                        dur: speed,
+                        loop: true,
+                        easing: 'linear',
+                        delay: i * (speed / electrons.length) // Зсув для створення потоку
+                    });
+                    
+                    // Анімація появи та зникнення
+                    electron.setAttribute(`animation__fade`, {
+                        property: 'material.opacity',
+                        from: 0,
+                        to: 1,
+                        dur: speed / 6,
+                        loop: true,
+                        dir: 'alternate',
+                        delay: i * (speed / electrons.length)
+                    });
+                } else {
+                    // Якщо струм = 0, зупиняємо анімацію
+                    const animationId = `electron-move-${i}`;
+                    electron.removeAttribute(`animation__${animationId}`);
+                    electron.removeAttribute(`animation__fade`);
+                    electron.setAttribute('material', 'opacity: 0.3');
+                }
+            }
+        }
+        
+        // Створення ліній магнітного поля
+        function createFieldLines() {
+            fieldLines.innerHTML = '';
+            
+            // Концентричні кола навколо кожного провідника
+            for (let conductor = 1; conductor <= 2; conductor++) {
+                const x = conductor === 1 ? -2 : 2;
+                const current = conductor === 1 ? current1 : current2;
+                
+                if (Math.abs(current) < 0.1) continue;
+                
+                // Визначаємо напрямок магнітного поля (правило правої руки)
+                const fieldDirection = current > 0 ? 1 : -1;
+                const fieldColor = current > 0 ? '#00FFFF' : '#FF00FF';
+                
+                // Створюємо кілька концентричних кіл різного радіуса
+                for (let radius = 0.3; radius <= 2.5; radius += 0.4) {
+                    const circle = document.createElement('a-ring');
+                    circle.setAttribute('radius-inner', radius - 0.03);
+                    circle.setAttribute('radius-outer', radius + 0.03);
+                    circle.setAttribute('color', fieldColor);
+                    
+                    // Інтенсивність поля зменшується з відстанню
+                    const intensity = Math.abs(current) / (radius * radius) * 0.5;
+                    circle.setAttribute('material', `opacity: ${Math.min(intensity, 0.6)}; transparent: true; emissive: ${fieldColor}; emissiveIntensity: 0.2`);
+                    circle.setAttribute('position', `${x} 0 0`);
+                    circle.setAttribute('rotation', '90 0 0');
+                    
+                    // Анімація обертання для показу напрямку поля
+                    const rotationSpeed = fieldDirection * Math.abs(current) * 1000;
+                    circle.setAttribute('animation__rotate', {
+                        property: 'rotation',
+                        to: `90 ${360 * fieldDirection} 0`,
+                        dur: Math.abs(rotationSpeed),
+                        loop: true,
+                        easing: 'linear'
+                    });
+                    
+                    // Анімація пульсації залежно від сили струму
+                    circle.setAttribute('animation__pulse', {
+                        property: 'material.opacity',
+                        to: Math.min(intensity * 0.3, 0.2),
+                        dur: 1500,
+                        dir: 'alternate',
+                        loop: true
+                    });
+                    
+                    fieldLines.appendChild(circle);
+                    
+                    // Додаємо стрілки для показу напрямку поля
+                    if (radius <= 1.5) {
+                        createFieldArrows(x, radius, fieldDirection, fieldColor);
+                    }
+                }
+            }
+            
+            // Показуємо взаємодію полів між провідниками
+            createInteractionField();
+        }
+        
+        // Створення стрілок для показу напрямку магнітного поля
+        function createFieldArrows(centerX, radius, direction, color) {
+            const numArrows = 8;
+            for (let i = 0; i < numArrows; i++) {
+                const angle = (i / numArrows) * 2 * Math.PI;
+                const x = centerX + radius * Math.cos(angle);
+                const z = radius * Math.sin(angle);
+                
+                const arrow = document.createElement('a-cone');
+                arrow.setAttribute('radius-bottom', '0.05');
+                arrow.setAttribute('radius-top', '0');
+                arrow.setAttribute('height', '0.15');
+                arrow.setAttribute('color', color);
+                arrow.setAttribute('material', `opacity: 0.7; transparent: true; emissive: ${color}; emissiveIntensity: 0.3`);
+                arrow.setAttribute('position', `${x} 0 ${z}`);
+                
+                // Розрахунок кута для напрямку стрілки
+                const arrowAngle = (angle * 180 / Math.PI) + (direction > 0 ? 90 : -90);
+                arrow.setAttribute('rotation', `0 ${arrowAngle} 90`);
+                
+                fieldLines.appendChild(arrow);
+            }
+        }
+        
+        // Створення візуалізації взаємодії магнітних полів
+        function createInteractionField() {
+            const force = calculateForce(current1, current2);
+            
+            if (Math.abs(force) < 1e-7) return;
+            
+            // Створюємо лінії взаємодії між провідниками
+            const numLines = 5;
+            for (let i = 0; i < numLines; i++) {
+                const y = -2 + (i / (numLines - 1)) * 4;
+                
+                const line = document.createElement('a-cylinder');
+                line.setAttribute('radius', '0.02');
+                line.setAttribute('height', '4');
+                line.setAttribute('position', '0 ' + y + ' 0');
+                line.setAttribute('rotation', '0 0 90');
+                
+                if (force > 0) {
+                    // Притягання - зелені лінії, що згинаються всередину
+                    line.setAttribute('color', '#4CAF50');
+                    line.setAttribute('material', 'opacity: 0.4; transparent: true; emissive: #4CAF50; emissiveIntensity: 0.2');
+                    
+                    // Анімація пульсації для притягання
+                    line.setAttribute('animation__attract', {
+                        property: 'scale',
+                        to: '0.8 1 0.8',
+                        dur: 1000,
+                        dir: 'alternate',
+                        loop: true
+                    });
+                } else {
+                    // Відштовхування - червоні лінії, що розширюються
+                    line.setAttribute('color', '#FF5722');
+                    line.setAttribute('material', 'opacity: 0.4; transparent: true; emissive: #FF5722; emissiveIntensity: 0.2');
+                    
+                    // Анімація розширення для відштовхування
+                    line.setAttribute('animation__repel', {
+                        property: 'scale',
+                        to: '1.2 1 1.2',
+                        dur: 1000,
+                        dir: 'alternate',
+                        loop: true
+                    });
+                }
+                
+                fieldLines.appendChild(line);
+            }
+        }
+        
+        // Розрахунок сили взаємодії
+        function calculateForce(i1, i2) {
+            // Закон Ампера: F = k * I1 * I2 / r
+            const k = 2e-7; // Константа
+            const r = 0.04; // Відстань між провідниками (4 см)
+            return k * i1 * i2 / r;
+        }
+        
+        // Оновлення позицій провідників
+        function updateConductorPositions() {
+            const force = calculateForce(current1, current2);
+            const displacement = Math.min(Math.abs(force) * 1000, 1.0); // Максимальне зміщення 1 м
+            
+            if (force > 0) {
+                // Притягання - провідники наближаються
+                conductor1.setAttribute('position', `${-baseDistance/2 + displacement} 0 0`);
+                conductor2.setAttribute('position', `${baseDistance/2 - displacement} 0 0`);
+            } else {
+                // Відштовхування - провідники віддаляються
+                conductor1.setAttribute('position', `${-baseDistance/2 - displacement} 0 0`);
+                conductor2.setAttribute('position', `${baseDistance/2 + displacement} 0 0`);
+            }
+        }
+        
+        // Оновлення стрілок напрямку
+        function updateArrows() {
+            // Стрілка першого провідника
+            if (current1 > 0) {
+                arrow1.setAttribute('rotation', '0 0 0');
+                arrow1.setAttribute('position', '0 3.5 0');
+            } else if (current1 < 0) {
+                arrow1.setAttribute('rotation', '0 0 180');
+                arrow1.setAttribute('position', '0 -3.5 0');
+            }
+            
+            // Стрілка другого провідника (завжди вгору)
+            arrow2.setAttribute('rotation', '0 0 0');
+            arrow2.setAttribute('position', '0 3.5 0');
+        }
+        
+        // Оновлення індикатора сили
+        function updateForceIndicator() {
+            const force = calculateForce(current1, current2);
+            const forceType = force > 0 ? 'Притягання' : 'Відштовхування';
+            const forceMagnitude = Math.abs(force);
+            
+            let forceLevel;
+            if (forceMagnitude < 1e-6) forceLevel = 'ВІДСУТНЯ';
+            else if (forceMagnitude < 5e-6) forceLevel = 'СЛАБКА';
+            else if (forceMagnitude < 1e-5) forceLevel = 'СЕРЕДНЯ';
+            else forceLevel = 'СИЛЬНА';
+            
+            const color = force > 0 ? '#4CAF50' : '#FF5722';
+            forceIndicator.setAttribute('value', `${forceType}: ${forceLevel}`);
+            forceIndicator.setAttribute('color', color);
+        }
+        
+        // Головна функція оновлення
+        function updateSimulation() {
+            updateConductorPositions();
+            updateArrows();
+            updateForceIndicator();
+            
+            // Анімація електронів
+            animateElectrons(electronsContainer1, current1, Math.sign(current1));
+            animateElectrons(electronsContainer2, current2, Math.sign(current2));
+            
+            createFieldLines();
+        }
+        
+        // Обробка зміни слайдера
+        document.getElementById('current-slider').addEventListener('input', function(e) {
+            current1 = parseFloat(e.target.value);
+            document.getElementById('current-display').textContent = current1.toFixed(1) + ' А';
+            updateSimulation();
+        });
+        
+        // Ініціалізація
+        document.addEventListener('DOMContentLoaded', function() {
+            // Створення електронів
+            createElectrons(electronsContainer1, 8, '#FFFF00');
+            createElectrons(electronsContainer2, 8, '#FFFF00');
+            
+            // Початкове оновлення
+            updateSimulation();
+        });
+    </script>
+</body>
+</html>

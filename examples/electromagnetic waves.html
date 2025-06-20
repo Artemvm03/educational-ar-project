@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <title>Симуляція електромагнітних хвиль</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #000;
+        }
+        
+        #ui {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            color: white;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #333;
+            width: 300px;
+        }
+        
+        .control-group {
+            margin: 15px 0;
+        }
+        
+        .control-label {
+            margin: 5px 0;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .slider {
+            width: 100%;
+            margin: 8px 0;
+        }
+        
+        .value-display {
+            font-weight: bold;
+            color: #4CAF50;
+            margin: 5px 0;
+        }
+        
+        .button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 12px;
+        }
+        
+        .button:hover {
+            background: #45a049;
+        }
+        
+        .info {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #bbb;
+            line-height: 1.4;
+        }
+        
+        .legend {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+        }
+        
+        .color-box {
+            width: 15px;
+            height: 15px;
+            border: 1px solid #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h3 style="margin-top: 0;">Електромагнітні хвилі</h3>
+        
+        <div class="control-group">
+            <div class="control-label">Частота (Hz):</div>
+            <input type="range" class="slider" id="frequency-slider" min="0.1" max="3" step="0.1" value="1">
+            <div class="value-display" id="frequency-display">1.0 Hz</div>
+        </div>
+        
+        <div class="control-group">
+            <div class="control-label">Амплітуда:</div>
+            <input type="range" class="slider" id="amplitude-slider" min="0.5" max="3" step="0.1" value="1.5">
+            <div class="value-display" id="amplitude-display">1.5</div>
+        </div>
+        
+        <div class="control-group">
+            <div class="control-label">Швидкість хвилі:</div>
+            <input type="range" class="slider" id="speed-slider" min="0.5" max="4" step="0.1" value="2">
+            <div class="value-display" id="speed-display">2.0</div>
+        </div>
+        
+        <div class="control-group">
+            <button class="button" id="pause-btn">Пауза</button>
+            <button class="button" id="reset-btn">Скидання</button>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="color-box" style="background: #FF4444;"></div>
+                <span>Електричне поле (E)</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: #4444FF;"></div>
+                <span>Магнітне поле (B)</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: #FFFF44;"></div>
+                <span>Напрямок поширення</span>
+            </div>
+        </div>
+        
+        <div class="info">
+            <strong>Властивості EM хвиль:</strong><br>
+            • E ⊥ B ⊥ напрямок поширення<br>
+            • E і B коливаються в фазі<br>
+            • Поперечні хвилі<br>
+            • Можуть поширюватись у вакуумі
+        </div>
+    </div>
+
+    <a-scene background="color: #000011" fog="type: linear; color: #000011; near: 1; far: 100">
+        <!-- Освітлення -->
+        <a-light type="ambient" color="#404040"></a-light>
+        <a-light type="directional" position="10 10 10" color="#ffffff" intensity="0.5"></a-light>
+        
+        <!-- Камера -->
+        <a-camera position="0 5 20" look-controls wasd-controls>
+            <a-cursor></a-cursor>
+        </a-camera>
+        
+        <!-- Система координат -->
+        <a-entity id="coordinate-system">
+            <!-- Вісь X (червона) -->
+            <a-cylinder position="10 0 0" rotation="0 0 90" radius="0.05" height="20" color="#FF0000" material="opacity: 0.3; transparent: true"></a-cylinder>
+            <a-text position="10.5 0 0" value="X" color="#FF0000" scale="2 2 2"></a-text>
+            
+            <!-- Вісь Y (зелена) -->
+            <a-cylinder position="0 10 0" rotation="0 0 0" radius="0.05" height="20" color="#00FF00" material="opacity: 0.3; transparent: true"></a-cylinder>
+            <a-text position="0 10.5 0" value="Y" color="#00FF00" scale="2 2 2"></a-text>
+            
+            <!-- Вісь Z (синя) -->
+            <a-cylinder position="0 0 10" rotation="90 0 0" radius="0.05" height="20" color="#0000FF" material="opacity: 0.3; transparent: true"></a-cylinder>
+            <a-text position="0 0 10.5" value="Z" color="#0000FF" scale="2 2 2"></a-text>
+        </a-entity>
+        
+        <!-- Електричне поле (E) - червоні вектори вздовж Y -->
+        <a-entity id="electric-field"></a-entity>
+        
+        <!-- Магнітне поле (B) - сині вектори вздовж Z -->
+        <a-entity id="magnetic-field"></a-entity>
+        
+        <!-- Напрямок поширення -->
+        <a-entity id="propagation-direction">
+            <a-cone position="15 0 0" rotation="0 0 -90" radius-bottom="0.3" radius-top="0" height="1" color="#FFFF00"></a-cone>
+            <a-text position="16 0 0" value="c" color="#FFFF00" scale="2 2 2"></a-text>
+        </a-entity>
+        
+        <!-- Довжина хвилі індикатор -->
+        <a-entity id="wavelength-indicator"></a-entity>
+        
+        <!-- Інформаційні підписи -->
+        <a-text position="0 8 0" value="Електричне поле (E)" color="#FF4444" align="center" scale="1.5 1.5 1.5"></a-text>
+        <a-text position="0 0 8" value="Магнітне поле (B)" color="#4444FF" align="center" scale="1.5 1.5 1.5"></a-text>
+        
+        <!-- Хвильова анімація -->
+        <a-entity id="wave-animation"></a-entity>
+    </a-scene>
+
+    <script>
+        // Параметри симуляції
+        let frequency = 1.0;      // Частота в Hz
+        let amplitude = 1.5;      // Амплітуда
+        let waveSpeed = 2.0;      // Швидкість хвилі
+        let time = 0;             // Час симуляції
+        let isPaused = false;     // Стан паузи
+        let animationId;          // ID анімації
+        
+        // Константи
+        const waveLength = 20;    // Довжина хвилі по осі X
+        const numVectors = 40;    // Кількість векторів
+        const maxAmplitude = 3;   // Максимальна амплітуда
+        
+        // Елементи сцени
+        const electricField = document.getElementById('electric-field');
+        const magneticField = document.getElementById('magnetic-field');
+        const wavelengthIndicator = document.getElementById('wavelength-indicator');
+        
+        // Створення векторів електричного поля
+        function createElectricField() {
+            electricField.innerHTML = '';
+            
+            for (let i = 0; i < numVectors; i++) {
+                const x = -10 + (20 * i / (numVectors - 1));
+                
+                // Основа вектора
+                const base = document.createElement('a-sphere');
+                base.setAttribute('position', `${x} 0 0`);
+                base.setAttribute('radius', '0.05');
+                base.setAttribute('color', '#FF4444');
+                base.setAttribute('id', `e-base-${i}`);
+                electricField.appendChild(base);
+                
+                // Вектор (циліндр)
+                const vector = document.createElement('a-cylinder');
+                vector.setAttribute('position', `${x} 0 0`);
+                vector.setAttribute('radius', '0.03');
+                vector.setAttribute('height', '0.1');
+                vector.setAttribute('color', '#FF4444');
+                vector.setAttribute('material', 'emissive: #FF2222; emissiveIntensity: 0.3');
+                vector.setAttribute('id', `e-vector-${i}`);
+                electricField.appendChild(vector);
+                
+                // Стрілка
+                const arrow = document.createElement('a-cone');
+                arrow.setAttribute('position', `${x} 0 0`);
+                arrow.setAttribute('radius-bottom', '0.08');
+                arrow.setAttribute('radius-top', '0');
+                arrow.setAttribute('height', '0.2');
+                arrow.setAttribute('color', '#FF4444');
+                arrow.setAttribute('id', `e-arrow-${i}`);
+                electricField.appendChild(arrow);
+            }
+        }
+        
+        // Створення векторів магнітного поля
+        function createMagneticField() {
+            magneticField.innerHTML = '';
+            
+            for (let i = 0; i < numVectors; i++) {
+                const x = -10 + (20 * i / (numVectors - 1));
+                
+                // Основа вектора
+                const base = document.createElement('a-sphere');
+                base.setAttribute('position', `${x} 0 0`);
+                base.setAttribute('radius', '0.05');
+                base.setAttribute('color', '#4444FF');
+                base.setAttribute('id', `b-base-${i}`);
+                magneticField.appendChild(base);
+                
+                // Вектор (циліндр)
+                const vector = document.createElement('a-cylinder');
+                vector.setAttribute('position', `${x} 0 0`);
+                vector.setAttribute('radius', '0.03');
+                vector.setAttribute('height', '0.1');
+                vector.setAttribute('color', '#4444FF');
+                vector.setAttribute('material', 'emissive: #2222FF; emissiveIntensity: 0.3');
+                vector.setAttribute('rotation', '90 0 0');
+                vector.setAttribute('id', `b-vector-${i}`);
+                magneticField.appendChild(vector);
+                
+                // Стрілка
+                const arrow = document.createElement('a-cone');
+                arrow.setAttribute('position', `${x} 0 0`);
+                arrow.setAttribute('radius-bottom', '0.08');
+                arrow.setAttribute('radius-top', '0');
+                arrow.setAttribute('height', '0.2');
+                arrow.setAttribute('color', '#4444FF');
+                arrow.setAttribute('rotation', '90 0 0');
+                arrow.setAttribute('id', `b-arrow-${i}`);
+                magneticField.appendChild(arrow);
+            }
+        }
+        
+        // Створення індикатора довжини хвилі
+        function createWavelengthIndicator() {
+            wavelengthIndicator.innerHTML = '';
+            
+            const wavelengthValue = waveSpeed / frequency;
+            const numCycles = Math.floor(20 / wavelengthValue);
+            
+            for (let i = 0; i <= numCycles; i++) {
+                const x = -10 + (i * wavelengthValue);
+                
+                // Вертикальна лінія
+                const line = document.createElement('a-cylinder');
+                line.setAttribute('position', `${x} -4 0`);
+                line.setAttribute('radius', '0.02');
+                line.setAttribute('height', '0.5');
+                line.setAttribute('color', '#FFFF44');
+                line.setAttribute('material', 'opacity: 0.7; transparent: true');
+                wavelengthIndicator.appendChild(line);
+                
+                // Підпис
+                if (i > 0) {
+                    const label = document.createElement('a-text');
+                    label.setAttribute('position', `${x - wavelengthValue/2} -4.5 0`);
+                    label.setAttribute('value', 'λ');
+                    label.setAttribute('color', '#FFFF44');
+                    label.setAttribute('align', 'center');
+                    label.setAttribute('scale', '1.5 1.5 1.5');
+                    wavelengthIndicator.appendChild(label);
+                }
+            }
+        }
+        
+        // Оновлення хвилі
+        function updateWave() {
+            if (isPaused) return;
+            
+            const wavelengthValue = waveSpeed / frequency;
+            const k = 2 * Math.PI / wavelengthValue; // Хвильове число
+            const omega = 2 * Math.PI * frequency;   // Кутова частота
+            
+            // Оновлення електричного поля
+            for (let i = 0; i < numVectors; i++) {
+                const x = -10 + (20 * i / (numVectors - 1));
+                const phase = k * x - omega * time;
+                const E_y = amplitude * Math.sin(phase);
+                
+                const vector = document.getElementById(`e-vector-${i}`);
+                const arrow = document.getElementById(`e-arrow-${i}`);
+                
+                if (vector && arrow) {
+                    const vectorHeight = Math.abs(E_y);
+                    const vectorY = E_y / 2;
+                    const arrowY = E_y > 0 ? vectorY + vectorHeight/2 + 0.1 : vectorY - vectorHeight/2 - 0.1;
+                    
+                    vector.setAttribute('position', `${x} ${vectorY} 0`);
+                    vector.setAttribute('height', vectorHeight);
+                    
+                    arrow.setAttribute('position', `${x} ${arrowY} 0`);
+                    arrow.setAttribute('rotation', E_y > 0 ? '0 0 0' : '0 0 180');
+                }
+            }
+            
+            // Оновлення магнітного поля (перпендикулярно до E)
+            for (let i = 0; i < numVectors; i++) {
+                const x = -10 + (20 * i / (numVectors - 1));
+                const phase = k * x - omega * time;
+                const B_z = amplitude * Math.sin(phase);
+                
+                const vector = document.getElementById(`b-vector-${i}`);
+                const arrow = document.getElementById(`b-arrow-${i}`);
+                
+                if (vector && arrow) {
+                    const vectorHeight = Math.abs(B_z);
+                    const vectorZ = B_z / 2;
+                    const arrowZ = B_z > 0 ? vectorZ + vectorHeight/2 + 0.1 : vectorZ - vectorHeight/2 - 0.1;
+                    
+                    vector.setAttribute('position', `${x} 0 ${vectorZ}`);
+                    vector.setAttribute('height', vectorHeight);
+                    
+                    arrow.setAttribute('position', `${x} 0 ${arrowZ}`);
+                    arrow.setAttribute('rotation', B_z > 0 ? '90 0 0' : '-90 0 0');
+                }
+            }
+            
+            time += 0.016; // ~60 FPS
+        }
+        
+        // Анімаційний цикл
+        function animate() {
+            updateWave();
+            animationId = requestAnimationFrame(animate);
+        }
+        
+        // Обробники подій
+        document.getElementById('frequency-slider').addEventListener('input', function(e) {
+            frequency = parseFloat(e.target.value);
+            document.getElementById('frequency-display').textContent = frequency.toFixed(1) + ' Hz';
+            createWavelengthIndicator();
+        });
+        
+        document.getElementById('amplitude-slider').addEventListener('input', function(e) {
+            amplitude = parseFloat(e.target.value);
+            document.getElementById('amplitude-display').textContent = amplitude.toFixed(1);
+        });
+        
+        document.getElementById('speed-slider').addEventListener('input', function(e) {
+            waveSpeed = parseFloat(e.target.value);
+            document.getElementById('speed-display').textContent = waveSpeed.toFixed(1);
+            createWavelengthIndicator();
+        });
+        
+        document.getElementById('pause-btn').addEventListener('click', function() {
+            isPaused = !isPaused;
+            this.textContent = isPaused ? 'Продовжити' : 'Пауза';
+        });
+        
+        document.getElementById('reset-btn').addEventListener('click', function() {
+            time = 0;
+            isPaused = false;
+            document.getElementById('pause-btn').textContent = 'Пауза';
+        });
+        
+        // Ініціалізація
+        document.addEventListener('DOMContentLoaded', function() {
+            createElectricField();
+            createMagneticField();
+            createWavelengthIndicator();
+            animate();
+        });
+    </script>
+</body>
+</html>
+
+

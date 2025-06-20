@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Електромагнетизм 3D (A.3.2)</title>
+<script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.1.0/dist/aframe-extras.min.js"></script>
+<style>
+body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+#info-panel {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 10px;
+  font-family: sans-serif;
+  border-radius: 5px;
+  z-index: 1000;
+}
+#controls-panel {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 10px;
+  font-family: sans-serif;
+  border-radius: 5px;
+  z-index: 1000;
+}
+#controls-panel label {
+  display: block;
+  margin-bottom: 5px;
+}
+</style>
+</head>
+<body>
+<a-scene vr-mode-ui="enabled: true">
+  <a-entity camera
+    look-controls
+    wasd-controls
+    position="0 1.6 3"
+    raycaster="objects: [data-charge-value]"
+    cursor="rayOrigin: mouse">
+  </a-entity>
+
+  <a-entity light="type: ambient; color: #BBB"></a-entity>
+  <a-entity light="type: directional; color: #FFF; intensity: 0.6" position="-1 1 1"></a-entity>
+  <a-sky color="#001122"></a-sky>
+  <a-plane position="0 0 0" rotation="-90 0 0" width="10" height="10" color="#7BC8A4" shadow></a-plane>
+  <a-entity id="field-lines-container" electric-field-lines></a-entity>
+</a-scene>
+
+<div id="info-panel">
+  <h3>Електромагнетизм 3D</h3>
+  <p>Використовуйте WASD для переміщення.</p>
+  <p>Мишею можна обертати камеру.</p>
+</div>
+
+<div id="controls-panel">
+  <h4>Контроль зарядів</h4>
+  <div>
+    <label>
+      <input type="checkbox" id="positiveChargeCheckbox" checked> Позитивний заряд (+Q)
+    </label>
+  </div>
+  <div>
+    <label>
+      <input type="checkbox" id="negativeChargeCheckbox" checked> Негативний заряд (-Q)
+    </label>
+  </div>
+</div>
+
+<script src="../src/components/interactive-charge.js"></script>
+<script src="../src/components/electric-field-lines.js"></script>
+<script src="../src/components/main.js"></script>
+</body>
+</html>
